@@ -28,4 +28,12 @@ describe('answer gate', () => {
     expect(atCap(3, 3)).toBe(true)
     expect(atCap(2, 3)).toBe(false)
   })
+
+  it('a failed verdict at the hint cap still does not unlock', () => {
+    const capped = { hintLevel: 3, lastGraderHint: 'earlier hint', unlocked: false }
+    const after = applyVerdict(capped, { understanding_demonstrated: false, reason: 'still vague', next_hint: 'one more nudge' }, 3)
+    expect(after.unlocked).toBe(false)
+    expect(after.hintLevel).toBe(3) // capped, not 4
+    expect(after.lastGraderHint).toBe('one more nudge')
+  })
 })
