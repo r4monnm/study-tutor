@@ -18,17 +18,17 @@ never given.
 Prereqs: Node 20+ (tested on Node 26).
 
 ```bash
-# 1. Configure credentials
-cp .env.example .env
-# edit .env and set ANTHROPIC_API_KEY
-
-# 2. Backend
+# 1. Backend + credentials
 cd server
+cp .env.example .env
+# edit server/.env and set ANTHROPIC_API_KEY
+#   (the env file lives in server/ — that's the service's working directory,
+#    where both `npm run dev` and a compiled build load it from)
 npm install
 npm test          # run the suite, incl. the red-team leak test
 npm run dev       # http://localhost:8787
 
-# 3. Frontend (separate terminal)
+# 2. Frontend (separate terminal)
 cd ../client
 npm install
 npm run dev       # http://localhost:5173
