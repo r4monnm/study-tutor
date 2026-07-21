@@ -29,4 +29,15 @@ describe('buildTutorContext', () => {
     const ctx = buildTutorContext(base)
     expect(ctx.messages).toEqual([{ role: 'user', content: 'Begin.' }])
   })
+
+  it('always yields a messages array beginning with a user turn (API requires it)', () => {
+    const assistantLedHistory = [
+      { role: 'assistant' as const, content: 'Posed question' },
+      { role: 'user' as const, content: 'my attempt' },
+    ]
+    const ctx = buildTutorContext({ ...base, history: assistantLedHistory, graderHint: 'nudge', hintLevel: 1 })
+    expect(ctx.messages[0].role).toBe('user')
+    // history is preserved after the synthetic opener
+    expect(ctx.messages.some((m) => m.content === 'my attempt')).toBe(true)
+  })
 })

@@ -40,6 +40,12 @@ export function buildTutorContext(inp: TutorContextInput): { system: string[]; m
     system.push('The learner has not attempted yet. Pose the current problem and invite a first attempt. Do not hint at or reveal the answer.')
   }
 
-  const messages: ChatTurn[] = inp.history.length ? inp.history : [{ role: 'user', content: 'Begin.' }]
+  const raw: ChatTurn[] = inp.history.length ? inp.history : [{ role: 'user', content: 'Begin.' }]
+  // The Anthropic Messages API requires the first message to be role 'user'.
+  // The first tutor turn stores an assistant message (the posed question) with no
+  // preceding user turn, so replayed history can begin with 'assistant'. Prepend a
+  // synthetic user turn to keep the array API-valid.
+  const messages: ChatTurn[] =
+    raw[0].role === 'assistant' ? [{ role: 'user', content: 'Begin.' }, ...raw] : raw
   return { system, messages }
 }
