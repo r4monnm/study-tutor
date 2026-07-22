@@ -40,6 +40,7 @@ export interface MasteryState {
 
 export interface Session {
   id: string
+  learnerId: string
   topic: string
   mode: Mode
   history: ChatTurn[]
@@ -51,7 +52,7 @@ export interface Session {
 }
 
 export interface Store {
-  createSession(): Session
+  createSession(learnerId?: string): Session
   getSession(id: string): Session | undefined
   setTopicMode(id: string, topic: string, mode: Mode): void
   addTurn(id: string, turn: ChatTurn): void

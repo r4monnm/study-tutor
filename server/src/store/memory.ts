@@ -4,8 +4,8 @@ import type { Store, Session, Problem, ProblemState, ChatTurn, Mode, Deck, Maste
 export class MemoryStore implements Store {
   private sessions = new Map<string, Session>()
 
-  createSession(): Session {
-    const s: Session = { id: randomUUID(), topic: '', mode: 'quiz', history: [], problems: {}, mastery: {}, personalBests: {} }
+  createSession(learnerId = ''): Session {
+    const s: Session = { id: randomUUID(), learnerId, topic: '', mode: 'quiz', history: [], problems: {}, mastery: {}, personalBests: {} }
     this.sessions.set(s.id, s)
     return s
   }

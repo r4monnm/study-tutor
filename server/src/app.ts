@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import type { Store, Mode, Deck } from './store/types'
 import type { Llm } from './llm/types'
+import { SqliteLearnerStore, type LearnerStore } from './learnerStore'
 import { config } from './config'
 import { generateProblem } from './problem'
 import { grade } from './grader'
@@ -16,8 +17,9 @@ import { updatePersonalBest } from './game'
 import { toClientProblem, toCardFront, GREETING } from './dto'
 import { screen } from './guardrail'
 
-export function createApp(deps: { store: Store; llm: Llm }): express.Express {
+export function createApp(deps: { store: Store; llm: Llm; learnerStore?: LearnerStore }): express.Express {
   const { store, llm } = deps
+  const learnerStore = deps.learnerStore ?? new SqliteLearnerStore()
   const app = express()
   app.use(cors())
   app.use(express.json())
@@ -34,8 +36,8 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     return deck
   }
 
-  app.post('/api/session', (_req, res) => {
-    const s = store.createSession()
+  app.post('/api/session', (req, res) => {
+    const s = store.createSession(String(req.body?.learnerId ?? ''))
     res.json({ id: s.id, greeting: GREETING })
   })
 
