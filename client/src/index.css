@@ -260,6 +260,7 @@ body {
 /* ---------- Markdown rendering (tutor bubbles) ---------- */
 .md {
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 .md > :first-child {
   margin-top: 0;
