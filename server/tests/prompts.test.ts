@@ -16,8 +16,8 @@ describe('prompts + modes', () => {
     expect(GRADER_SYSTEM).toContain('Be conservative')
   })
 
-  it('only quiz mode is active', () => {
+  it('quiz and notes modes are active', () => {
     expect(modeInstructions('quiz')).toContain('QUIZ mode')
-    expect(modeInstructions('notes')).toContain('not available yet')
+    expect(modeInstructions('notes')).toContain('NOTES mode')
   })
 })

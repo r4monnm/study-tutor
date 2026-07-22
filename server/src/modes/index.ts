@@ -6,11 +6,17 @@ const QUIZ_INSTRUCTIONS = `You are running QUIZ mode. Pose exactly ONE question 
 - Mix question types across problems so the learner cannot autopilot.
 - Only confirm the answer once the app signals the understanding check passed.`
 
+const NOTES_INSTRUCTIONS = `You are running NOTES mode. Deliver the topic as short, paced chunks — one chunk per turn, each ending with a single check question. Never present the whole topic at once, and wait for the learner to respond (or say they're ready) before continuing.`
+
+const FLASHCARDS_INSTRUCTIONS = `Flashcards mode is app-driven: the learner is shown a term, types their recall, and a grader checks it before the back is revealed. (No streamed tutor turn is used for this mode.)`
+
+const GAME_INSTRUCTIONS = `Game mode is app-driven: a timed term/definition matching board. (No streamed tutor turn or grader is used for this mode.)`
+
 export const MODE_INSTRUCTIONS: Record<Mode, string> = {
   quiz: QUIZ_INSTRUCTIONS,
-  notes: 'This mode is not available yet. Tell the learner to pick Quiz mode.',
-  flashcards: 'This mode is not available yet. Tell the learner to pick Quiz mode.',
-  game: 'This mode is not available yet. Tell the learner to pick Quiz mode.',
+  notes: NOTES_INSTRUCTIONS,
+  flashcards: FLASHCARDS_INSTRUCTIONS,
+  game: GAME_INSTRUCTIONS,
 }
 
 export function modeInstructions(mode: Mode): string {
