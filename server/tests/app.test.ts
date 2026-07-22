@@ -3,6 +3,7 @@ import request from 'supertest'
 import { createApp } from '../src/app'
 import { MemoryStore } from '../src/store/memory'
 import { FakeLlm } from './helpers/fakeLlm'
+import { fakeAuth } from './helpers/fakeAuth'
 
 const SECRET = 'ZEBRA_ANSWER_42'
 
@@ -25,7 +26,7 @@ function setup(echo = true) {
   const store = new MemoryStore()
   const llm = new FakeLlm()
   llm.echoContext = echo // tutor "leaks" everything it was given, so the test can inspect it
-  const app = createApp({ store, llm })
+  const app = createApp({ store, llm, auth: fakeAuth() })
   return { app, llm, store }
 }
 

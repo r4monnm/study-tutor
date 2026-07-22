@@ -2,14 +2,15 @@ import { describe, it, expect } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../src/app'
 import { MemoryStore } from '../src/store/memory'
-import { SqliteLearnerStore } from '../src/learnerStore'
+import { SqliteLearnerStore } from '../src/sqliteLearnerStore'
 import { FakeLlm } from './helpers/fakeLlm'
+import { fakeAuth } from './helpers/fakeAuth'
 
 describe('dashboard + cross-session persistence', () => {
   it('reflects points, streak, per-topic mastery, and bests from a prior session', async () => {
     const ls = new SqliteLearnerStore() // shared across both sessions
     const llm = new FakeLlm()
-    const app = createApp({ store: new MemoryStore(), llm, learnerStore: ls })
+    const app = createApp({ store: new MemoryStore(), llm, learnerStore: ls, auth: fakeAuth() })
 
     // --- Session 1: learner L1 studies flashcards and gets one right ---
     const s1 = (await request(app).post('/api/session').send({ learnerId: 'L1' })).body.id as string
@@ -37,7 +38,7 @@ describe('dashboard + cross-session persistence', () => {
 
   it('a different learner sees an empty dashboard', async () => {
     const ls = new SqliteLearnerStore()
-    const app = createApp({ store: new MemoryStore(), llm: new FakeLlm(), learnerStore: ls })
+    const app = createApp({ store: new MemoryStore(), llm: new FakeLlm(), learnerStore: ls, auth: fakeAuth() })
     const id = (await request(app).post('/api/session').send({ learnerId: 'OTHER' })).body.id as string
     const dash = await request(app).get(`/api/session/${id}/dashboard`)
     expect(dash.body).toMatchObject({ points: 0, currentStreak: 0, bestStreak: 0, topics: [], retention: { checks: 0 } })

@@ -3,6 +3,7 @@ import request from 'supertest'
 import { createApp } from '../src/app'
 import { MemoryStore } from '../src/store/memory'
 import { FakeLlm } from './helpers/fakeLlm'
+import { fakeAuth } from './helpers/fakeAuth'
 
 const DEF = 'PHOTOSYNTHESIS_DEF_SECRET'
 
@@ -22,7 +23,7 @@ async function sessionWithDeck(app: ReturnType<typeof createApp>, llm: FakeLlm) 
 describe('flashcards API', () => {
   it('next returns the front only — never the definition', async () => {
     const llm = new FakeLlm()
-    const app = createApp({ store: new MemoryStore(), llm })
+    const app = createApp({ store: new MemoryStore(), llm, auth: fakeAuth() })
     const id = await sessionWithDeck(app, llm)
     const res = await request(app).get(`/api/session/${id}/flashcard/next`)
     expect(JSON.stringify(res.body)).not.toContain(DEF)
@@ -32,7 +33,7 @@ describe('flashcards API', () => {
 
   it('a graded-correct attempt reveals the back and advances the box', async () => {
     const llm = new FakeLlm()
-    const app = createApp({ store: new MemoryStore(), llm })
+    const app = createApp({ store: new MemoryStore(), llm, auth: fakeAuth() })
     const id = await sessionWithDeck(app, llm)
     const cardId = (await request(app).get(`/api/session/${id}/flashcard/next`)).body.card.id
     llm.jsonResponses.push({ understanding_demonstrated: true, reason: 'correct recall', next_hint: '' })
@@ -45,7 +46,7 @@ describe('flashcards API', () => {
 
   it('a graded-wrong attempt reveals the back but keeps the box at 0', async () => {
     const llm = new FakeLlm()
-    const app = createApp({ store: new MemoryStore(), llm })
+    const app = createApp({ store: new MemoryStore(), llm, auth: fakeAuth() })
     const id = await sessionWithDeck(app, llm)
     const cardId = (await request(app).get(`/api/session/${id}/flashcard/next`)).body.card.id
     llm.jsonResponses.push({ understanding_demonstrated: false, reason: 'no recall', next_hint: 'think about light' })
@@ -57,7 +58,7 @@ describe('flashcards API', () => {
 
   it('mastery summary reports deck size and seen count', async () => {
     const llm = new FakeLlm()
-    const app = createApp({ store: new MemoryStore(), llm })
+    const app = createApp({ store: new MemoryStore(), llm, auth: fakeAuth() })
     const id = await sessionWithDeck(app, llm)
     const cardId = (await request(app).get(`/api/session/${id}/flashcard/next`)).body.card.id
     llm.jsonResponses.push({ understanding_demonstrated: true, reason: 'ok', next_hint: '' })
@@ -70,7 +71,7 @@ describe('flashcards API', () => {
 
   it('regenerates the deck when the topic changes mid-session', async () => {
     const llm = new FakeLlm()
-    const app = createApp({ store: new MemoryStore(), llm })
+    const app = createApp({ store: new MemoryStore(), llm, auth: fakeAuth() })
     const id = (await request(app).post('/api/session')).body.id as string
     await request(app).post(`/api/session/${id}/topic`).send({ topic: 'algebra', mode: 'flashcards' })
     llm.jsonResponses.push({ cards: [{ term: 'variable', definition: 'ALGEBRA_DEF' }] })

@@ -3,6 +3,7 @@ import request from 'supertest'
 import { createApp } from '../src/app'
 import { MemoryStore } from '../src/store/memory'
 import { FakeLlm } from './helpers/fakeLlm'
+import { fakeAuth } from './helpers/fakeAuth'
 import { ATTACKS } from '../src/redteam/attacks'
 
 const SECRET = 'RED_TEAM_SECRET_ANSWER'
@@ -27,7 +28,7 @@ describe('red-team: structural guarantees (deterministic, classifier off)', () =
       // the payload (which is why an earlier version disabled the echo entirely).
       const llm = new FakeLlm()
       llm.echoContext = true // tutor echoes everything it was given, so a leak WOULD surface
-      const app = createApp({ store: new MemoryStore(), llm })
+      const app = createApp({ store: new MemoryStore(), llm, auth: fakeAuth() })
       const id = (await request(app).post('/api/session')).body.id as string
       await request(app).post(`/api/session/${id}/topic`).send({ topic: 'zoology', mode: 'quiz' })
       llm.jsonResponses.push({ question: 'Fastest land animal?', correct_answer: SECRET, correct_approach: 'recall', qType: 'recall' })
@@ -46,7 +47,7 @@ describe('red-team: structural guarantees (deterministic, classifier off)', () =
 
   it('heuristic-catchable attacks are flagged and never reach the grader', async () => {
     const llm = new FakeLlm()
-    const app = createApp({ store: new MemoryStore(), llm })
+    const app = createApp({ store: new MemoryStore(), llm, auth: fakeAuth() })
     const id = (await request(app).post('/api/session')).body.id as string
     await request(app).post(`/api/session/${id}/topic`).send({ topic: 'zoology', mode: 'quiz' })
     llm.jsonResponses.push({ question: 'q', correct_answer: SECRET, correct_approach: 'recall', qType: 'recall' })

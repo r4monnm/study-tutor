@@ -7,11 +7,13 @@
     "start": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:supabase": "vitest run --config vitest.it.config.ts",
     "typecheck": "tsc --noEmit",
     "redteam": "tsx src/redteam/report.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.4",
+    "@supabase/supabase-js": "^2.110.8",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1"

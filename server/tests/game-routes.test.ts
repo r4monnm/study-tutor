@@ -3,6 +3,7 @@ import request from 'supertest'
 import { createApp } from '../src/app'
 import { MemoryStore } from '../src/store/memory'
 import { FakeLlm } from './helpers/fakeLlm'
+import { fakeAuth } from './helpers/fakeAuth'
 
 async function sessionWithDeck(app: ReturnType<typeof createApp>, llm: FakeLlm) {
   const id = (await request(app).post('/api/session')).body.id as string
@@ -16,7 +17,7 @@ async function sessionWithDeck(app: ReturnType<typeof createApp>, llm: FakeLlm) 
 describe('game API', () => {
   it('board has 12 tiles (6 term + 6 def) from 6 cards', async () => {
     const llm = new FakeLlm()
-    const app = createApp({ store: new MemoryStore(), llm })
+    const app = createApp({ store: new MemoryStore(), llm, auth: fakeAuth() })
     const id = await sessionWithDeck(app, llm)
     const res = await request(app).get(`/api/session/${id}/game/board`)
     expect(res.body.tiles).toHaveLength(12)
@@ -26,7 +27,7 @@ describe('game API', () => {
 
   it('records a personal best and reports improvements', async () => {
     const llm = new FakeLlm()
-    const app = createApp({ store: new MemoryStore(), llm })
+    const app = createApp({ store: new MemoryStore(), llm, auth: fakeAuth() })
     const id = await sessionWithDeck(app, llm)
     let res = await request(app).post(`/api/session/${id}/game/result`).send({ timeSeconds: 40, wrongMatches: 0 })
     expect(res.body.personalBest).toBe(40); expect(res.body.isNewBest).toBe(true); expect(res.body.points).toBe(12)

@@ -4,53 +4,53 @@ import type { Store, Session, Problem, ProblemState, ChatTurn, Mode, Deck } from
 export class MemoryStore implements Store {
   private sessions = new Map<string, Session>()
 
-  createSession(learnerId = ''): Session {
+  async createSession(learnerId = ''): Promise<Session> {
     const s: Session = { id: randomUUID(), learnerId, topic: '', mode: 'quiz', history: [], problems: {} }
     this.sessions.set(s.id, s)
     return s
   }
 
-  getSession(id: string): Session | undefined {
+  async getSession(id: string): Promise<Session | undefined> {
     return this.sessions.get(id)
   }
 
-  setTopicMode(id: string, topic: string, mode: Mode): void {
+  async setTopicMode(id: string, topic: string, mode: Mode): Promise<void> {
     const s = this.must(id); s.topic = topic; s.mode = mode
   }
 
-  addTurn(id: string, turn: ChatTurn): void {
+  async addTurn(id: string, turn: ChatTurn): Promise<void> {
     this.must(id).history.push(turn)
   }
 
-  putProblem(sid: string, p: Problem): void {
+  async putProblem(sid: string, p: Problem): Promise<void> {
     const s = this.must(sid)
     s.problems[p.id] = { problem: p, state: { hintLevel: 0, lastGraderHint: '', unlocked: false } }
     s.activeProblemId = p.id
   }
 
-  getProblem(sid: string, pid: string): Problem | undefined {
-    return this.getSession(sid)?.problems[pid]?.problem
+  async getProblem(sid: string, pid: string): Promise<Problem | undefined> {
+    return this.sessions.get(sid)?.problems[pid]?.problem
   }
 
-  getActiveProblem(sid: string): Problem | undefined {
-    const s = this.getSession(sid)
+  async getActiveProblem(sid: string): Promise<Problem | undefined> {
+    const s = this.sessions.get(sid)
     return s?.activeProblemId ? s.problems[s.activeProblemId]?.problem : undefined
   }
 
-  getProblemState(sid: string, pid: string): ProblemState {
+  async getProblemState(sid: string, pid: string): Promise<ProblemState> {
     return this.must(sid).problems[pid].state
   }
 
-  setProblemState(sid: string, pid: string, state: ProblemState): void {
+  async setProblemState(sid: string, pid: string, state: ProblemState): Promise<void> {
     this.must(sid).problems[pid].state = state
   }
 
-  putDeck(sid: string, deck: Deck): void {
+  async putDeck(sid: string, deck: Deck): Promise<void> {
     this.must(sid).deck = deck
   }
 
-  getDeck(sid: string): Deck | undefined {
-    return this.getSession(sid)?.deck
+  async getDeck(sid: string): Promise<Deck | undefined> {
+    return this.sessions.get(sid)?.deck
   }
 
   private must(id: string): Session {

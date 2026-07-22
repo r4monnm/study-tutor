@@ -50,15 +50,15 @@ export interface Session {
 }
 
 export interface Store {
-  createSession(learnerId?: string): Session
-  getSession(id: string): Session | undefined
-  setTopicMode(id: string, topic: string, mode: Mode): void
-  addTurn(id: string, turn: ChatTurn): void
-  putProblem(sid: string, p: Problem): void
-  getProblem(sid: string, pid: string): Problem | undefined
-  getActiveProblem(sid: string): Problem | undefined
-  getProblemState(sid: string, pid: string): ProblemState
-  setProblemState(sid: string, pid: string, state: ProblemState): void
-  putDeck(sid: string, deck: Deck): void
-  getDeck(sid: string): Deck | undefined
+  createSession(learnerId?: string): Promise<Session>
+  getSession(id: string): Promise<Session | undefined>
+  setTopicMode(id: string, topic: string, mode: Mode): Promise<void>
+  addTurn(id: string, turn: ChatTurn): Promise<void>
+  putProblem(sid: string, p: Problem): Promise<void>
+  getProblem(sid: string, pid: string): Promise<Problem | undefined>
+  getActiveProblem(sid: string): Promise<Problem | undefined>
+  getProblemState(sid: string, pid: string): Promise<ProblemState>
+  setProblemState(sid: string, pid: string, state: ProblemState): Promise<void>
+  putDeck(sid: string, deck: Deck): Promise<void>
+  getDeck(sid: string): Promise<Deck | undefined>
 }

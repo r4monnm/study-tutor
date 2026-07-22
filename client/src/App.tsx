@@ -3,10 +3,12 @@ import Markdown from './components/Markdown'
 import {
   createSession, setTopic, newProblem, submitAttempt, streamTutor,
   notesSay, streamNotes, nextCard, gradeCard, reviewDue, reviewAttempt,
+  loadChat, appendChat, clearChat,
   type DueItem,
 } from './api'
 import GameView from './views/GameView'
 import DashboardView from './views/DashboardView'
+import { supabase } from './lib/supabase'
 
 type Mode = 'quiz' | 'notes' | 'flashcards' | 'review'
 type Overlay = 'game' | 'dashboard' | null
@@ -21,7 +23,7 @@ const CHIPS: { m: Mode | 'game' | 'dashboard'; label: string }[] = [
   { m: 'dashboard', label: '📊 Dashboard' },
 ]
 
-export default function App() {
+export default function App({ email = '' }: { email?: string }) {
   const [sessionId, setSessionId] = useState('')
   const [topic, setTopicState] = useState('')
   const [mode, setMode] = useState<Mode | null>(null)
@@ -39,19 +41,28 @@ export default function App() {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   useEffect(() => {
-    createSession().then((s) => {
+    // A fresh study session every load (topic/gate state is per session), but the
+    // visible thread is restored from the account so the conversation carries over.
+    Promise.all([createSession(), loadChat()]).then(([s, history]) => {
       setSessionId(s.id)
-      setMessages([{ role: 'tutor', text: `${s.greeting}\n\nTell me a topic above, then pick a mode below to begin.` }])
+      if (history.length > 0) { setMessages(history); return }
+      const greeting = { role: 'tutor' as const, text: `${s.greeting}\n\nTell me a topic above, then pick a mode below to begin.` }
+      setMessages([greeting])
+      appendChat(greeting.role, greeting.text)
     })
   }, [])
 
-  const push = (m: Msg) => setMessages((prev) => [...prev, m])
+  const push = (m: Msg) => {
+    setMessages((prev) => [...prev, m])
+    appendChat(m.role, m.text)
+  }
 
   // Stream a tutor/notes turn into a single growing bubble.
   function streamInto(run: (onToken: (t: string) => void, onDone: () => void) => void) {
     setBusy(true)
     let acc = ''
-    push({ role: 'tutor', text: '' })
+    // The placeholder bubble is local-only; the turn is persisted once, when complete.
+    setMessages((prev) => [...prev, { role: 'tutor', text: '' }])
     run(
       (t) => {
         acc += t
@@ -59,11 +70,12 @@ export default function App() {
       },
       () => {
         setBusy(false)
-        if (acc === '') setMessages((prev) => {
-          const c = [...prev]
-          c[c.length - 1] = { role: 'tutor', text: '⚠️ Couldn’t reach the tutor — check that the server is running and the API key in server/.env is valid.' }
-          return c
-        })
+        if (acc === '') {
+          const failed = '⚠️ Couldn’t reach the tutor — check that the server is running and the API key in server/.env is valid.'
+          setMessages((prev) => { const c = [...prev]; c[c.length - 1] = { role: 'tutor', text: failed }; return c })
+          return // a failed turn is not worth persisting
+        }
+        appendChat('tutor', acc)
       },
     )
   }
@@ -145,26 +157,31 @@ export default function App() {
   }
 
   return (
-    <div className="relative flex h-screen flex-col text-slate-100">
+    <div className="relative flex h-[100dvh] flex-col text-slate-100">
       <div className="aurora-bg" />
       <div className="aurora-veil" />
 
       {/* header */}
-      <header className="mx-auto flex w-full max-w-2xl items-center gap-3 px-6 pt-5 pb-3">
-        <h1 className="brand text-2xl font-black tracking-tight">Study Tutor</h1>
-        <div className="glass-soft flex items-center gap-2 px-3 py-1.5">
-          <span className="dim text-xs">Studying</span>
-          <input className="w-40 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+      <header className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-2 px-4 pt-4 pb-3 sm:gap-3 sm:px-6 sm:pt-5">
+        <h1 className="brand text-xl font-black tracking-tight sm:text-2xl">Study Tutor</h1>
+        <div className="glass-soft flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 sm:flex-none">
+          <span className="dim shrink-0 text-xs">Studying</span>
+          <input className="w-full min-w-0 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none sm:w-40"
             placeholder="a topic…" value={topic} onChange={(e) => setTopicState(e.target.value)} />
         </div>
-        <button className="btn-ghost ml-auto text-sm" onClick={() => setOverlay('dashboard')}>📊</button>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <button className="btn-ghost text-sm" title="Dashboard" onClick={() => setOverlay('dashboard')}>📊</button>
+          <button className="btn-ghost text-sm" title="Clear this thread" disabled={busy}
+            onClick={async () => { await clearChat(); setMessages([]); setMode(null) }}>🗑</button>
+          <button className="btn-ghost text-sm" title={email || 'Sign out'} onClick={() => supabase.auth.signOut()}>Sign out</button>
+        </div>
       </header>
 
       {/* chat thread */}
-      <main className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-6">
+      <main className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 sm:px-6">
         <div className="flex flex-col gap-3 py-2">
           {messages.map((m, i) => {
-            if (m.role === 'you') return <div key={i} className="bubble-you max-w-[85%] self-end rounded-2xl px-4 py-2.5 whitespace-pre-wrap">{m.text}</div>
+            if (m.role === 'you') return <div key={i} className="bubble-you max-w-[85%] self-end rounded-2xl px-4 py-2.5 whitespace-pre-wrap break-words">{m.text}</div>
             if (m.role === 'system') return <div key={i} className="msg-in dim self-center text-xs uppercase tracking-wide">{m.text}</div>
             return (
               <div key={i} className="bubble-tutor md max-w-[85%] self-start rounded-2xl px-4 py-2.5">
@@ -180,7 +197,7 @@ export default function App() {
       </main>
 
       {/* composer */}
-      <div className="mx-auto w-full max-w-2xl px-6 pb-5 pt-2">
+      <div className="mx-auto w-full max-w-2xl px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-5">
         <div className="mb-2 flex flex-wrap gap-1.5">
           {CHIPS.map(({ m, label: l }) => {
             const needsTopic = m !== 'dashboard' && m !== 'review'
@@ -202,8 +219,8 @@ export default function App() {
 
       {/* overlays */}
       {overlay && (
-        <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto bg-black/50 p-6 backdrop-blur-sm" onClick={() => setOverlay(null)}>
-          <div className="glass mt-10 w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto bg-black/50 p-3 backdrop-blur-sm sm:p-6" onClick={() => setOverlay(null)}>
+          <div className="glass mt-4 w-full max-w-2xl p-4 sm:mt-10 sm:p-6" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold capitalize">{overlay}</h2>
               <button className="btn-ghost text-sm" onClick={() => setOverlay(null)}>✕ Close</button>
