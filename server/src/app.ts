@@ -14,6 +14,7 @@ import { buildNotesContext } from './notes'
 import { buildBoard } from './game'
 import { updatePersonalBest } from './game'
 import { toClientProblem, toCardFront, GREETING } from './dto'
+import { screen } from './guardrail'
 
 export function createApp(deps: { store: Store; llm: Llm }): express.Express {
   const { store, llm } = deps
@@ -60,6 +61,17 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     const problem = store.getActiveProblem(s.id)
     if (!problem) return res.status(400).json({ error: 'no active problem' })
     const attempt = String(req.body?.attempt ?? '')
+    const guard = await screen(llm, attempt)
+    if (guard.flagged) {
+      const state = store.getProblemState(s.id, problem.id)
+      return res.json({
+        flagged: true,
+        category: guard.category,
+        redirect: guard.redirect,
+        hintLevel: state.hintLevel,
+        unlocked: state.unlocked,
+      })
+    }
     store.addTurn(s.id, { role: 'user', content: attempt })
     const verdict = await grade(llm, {
       question: problem.question,
@@ -131,6 +143,17 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     const card = deck?.cards.find((c) => c.id === req.params.cardId)
     if (!card) return res.status(404).json({ error: 'no card' })
     const attempt = String(req.body?.attempt ?? '')
+    const guard = await screen(llm, attempt)
+    if (guard.flagged) {
+      const prior = store.getMastery(req.params.id, card.id) ?? initialMasteryState()
+      return res.json({
+        flagged: true,
+        category: guard.category,
+        redirect: guard.redirect,
+        box: prior.box,
+        mastered: isMastered(prior),
+      })
+    }
     const verdict = await grade(llm, {
       question: card.term,
       correct_approach: 'Recall the definition of the term.',
@@ -180,10 +203,15 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     return res.json(result)
   })
 
-  app.post('/api/session/:id/notes/say', (req, res) => {
+  app.post('/api/session/:id/notes/say', async (req, res) => {
     const s = store.getSession(req.params.id)
     if (!s) return res.status(404).json({ error: 'no session' })
-    store.addTurn(req.params.id, { role: 'user', content: String(req.body?.text ?? '') })
+    const text = String(req.body?.text ?? '')
+    const guard = await screen(llm, text)
+    if (guard.flagged) {
+      return res.json({ flagged: true, category: guard.category, redirect: guard.redirect })
+    }
+    store.addTurn(req.params.id, { role: 'user', content: text })
     return res.json({ ok: true })
   })
 
