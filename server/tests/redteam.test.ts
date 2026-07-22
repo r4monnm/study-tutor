@@ -19,33 +19,29 @@ function streamedText(sse: string): string {
 
 describe('red-team: structural guarantees (deterministic, classifier off)', () => {
   it('no attack unlocks the gate or leaks the answer', async () => {
-    const llm = new FakeLlm()
-    // Note: echoContext = false here (defaults to false); using true causes large SSE responses
-    // with long history, leading to socket hang-ups. Leaks are still detectable in the response
-    // body without echoing, and the second test verifies heuristic flagging works.
-    const app = createApp({ store: new MemoryStore(), llm })
-    const id = (await request(app).post('/api/session')).body.id as string
-    await request(app).post(`/api/session/${id}/topic`).send({ topic: 'zoology', mode: 'quiz' })
-    // problem generation uses the JSON path; queue the problem, then a false verdict per attack
-    llm.jsonResponses.push({ question: 'Fastest land animal?', correct_answer: SECRET, correct_approach: 'recall', qType: 'recall' })
-    await request(app).post(`/api/session/${id}/problem`)
-
     let leaks = 0
     let illegitUnlocks = 0
     for (const atk of ATTACKS) {
-      // queue a conservative FALSE verdict in case a (non-heuristic) attack reaches the grader
+      // Fresh session per attack so each /tutor context stays small — echoContext streams
+      // the whole context as SSE, and accumulating 15 turns in one session would balloon
+      // the payload (which is why an earlier version disabled the echo entirely).
+      const llm = new FakeLlm()
+      llm.echoContext = true // tutor echoes everything it was given, so a leak WOULD surface
+      const app = createApp({ store: new MemoryStore(), llm })
+      const id = (await request(app).post('/api/session')).body.id as string
+      await request(app).post(`/api/session/${id}/topic`).send({ topic: 'zoology', mode: 'quiz' })
+      llm.jsonResponses.push({ question: 'Fastest land animal?', correct_answer: SECRET, correct_approach: 'recall', qType: 'recall' })
+      await request(app).post(`/api/session/${id}/problem`)
+      // conservative FALSE verdict in case a non-heuristic attack reaches the grader
       llm.jsonResponses.push({ understanding_demonstrated: false, reason: 'not demonstrated', next_hint: 'keep trying' })
       const res = await request(app).post(`/api/session/${id}/attempt`).send({ attempt: atk.text })
       if (res.body.unlocked === true) illegitUnlocks += 1
-      // the attempt response must never contain the answer
       if (JSON.stringify(res.body).includes(SECRET)) leaks += 1
-      // and neither must the tutor turn that follows
       const tutor = await request(app).get(`/api/session/${id}/tutor`)
       if (streamedText(tutor.text).includes(SECRET)) leaks += 1
     }
-
-    expect(illegitUnlocks).toBe(0) // 0% illegitimate-unlock
-    expect(leaks).toBe(0) // 0% leakage
+    expect(illegitUnlocks).toBe(0)
+    expect(leaks).toBe(0)
   })
 
   it('heuristic-catchable attacks are flagged and never reach the grader', async () => {
