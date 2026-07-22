@@ -198,9 +198,13 @@ export function createApp(deps: { store: Store; llm: Llm; learnerStore?: Learner
     if (!s) return res.status(404).json({ error: 'no session' })
     const seconds = Number(req.body?.timeSeconds)
     if (!Number.isFinite(seconds) || seconds < 0) return res.status(400).json({ error: 'bad timeSeconds' })
-    const result = updatePersonalBest(store.getPersonalBest(req.params.id, s.topic), seconds)
-    store.setPersonalBest(req.params.id, s.topic, result.personalBest)
-    return res.json(result)
+    const wrongMatches = Number(req.body?.wrongMatches)
+    const result = updatePersonalBest(learnerStore.getPersonalBest(s.learnerId, s.topic), seconds)
+    learnerStore.setPersonalBest(s.learnerId, s.topic, result.personalBest)
+    // Accuracy-scaled points: a clean board (0 wrong) earns the most; never below 1.
+    const points = Number.isFinite(wrongMatches) ? Math.max(1, 12 - Math.max(0, wrongMatches)) : 1
+    learnerStore.awardCorrect(s.learnerId, points)
+    return res.json({ ...result, points })
   })
 
   app.post('/api/session/:id/notes/say', async (req, res) => {

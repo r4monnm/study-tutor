@@ -5,9 +5,8 @@ import type { Deck } from '../src/store/types'
 const deck: Deck = { topic: 'algebra', cards: [{ id: 'c1', term: 'variable', definition: 'a named value' }] }
 
 describe('MemoryStore stage 2', () => {
-  it('initializes empty mastery + personalBests on a new session', () => {
+  it('initializes a new session with no deck', () => {
     const s = new MemoryStore().createSession()
-    expect(s.personalBests).toEqual({})
     expect(s.deck).toBeUndefined()
   })
 
@@ -15,12 +14,5 @@ describe('MemoryStore stage 2', () => {
     const store = new MemoryStore(); const s = store.createSession()
     store.putDeck(s.id, deck)
     expect(store.getDeck(s.id)?.cards[0].term).toBe('variable')
-  })
-
-  it('stores and reads a per-topic personal best', () => {
-    const store = new MemoryStore(); const s = store.createSession()
-    expect(store.getPersonalBest(s.id, 'algebra')).toBeUndefined()
-    store.setPersonalBest(s.id, 'algebra', 42)
-    expect(store.getPersonalBest(s.id, 'algebra')).toBe(42)
   })
 })

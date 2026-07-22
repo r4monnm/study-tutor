@@ -5,7 +5,7 @@ export class MemoryStore implements Store {
   private sessions = new Map<string, Session>()
 
   createSession(learnerId = ''): Session {
-    const s: Session = { id: randomUUID(), learnerId, topic: '', mode: 'quiz', history: [], problems: {}, personalBests: {} }
+    const s: Session = { id: randomUUID(), learnerId, topic: '', mode: 'quiz', history: [], problems: {} }
     this.sessions.set(s.id, s)
     return s
   }
@@ -51,14 +51,6 @@ export class MemoryStore implements Store {
 
   getDeck(sid: string): Deck | undefined {
     return this.getSession(sid)?.deck
-  }
-
-  getPersonalBest(sid: string, topic: string): number | undefined {
-    return this.getSession(sid)?.personalBests[topic]
-  }
-
-  setPersonalBest(sid: string, topic: string, seconds: number): void {
-    this.must(sid).personalBests[topic] = seconds
   }
 
   private must(id: string): Session {
