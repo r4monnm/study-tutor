@@ -85,6 +85,7 @@ export function createApp(deps: { store: Store; llm: Llm; learnerStore?: Learner
     })
     const next = applyVerdict(store.getProblemState(s.id, problem.id), verdict, config.hintCap)
     store.setProblemState(s.id, problem.id, next)
+    awardRecall(learnerStore, s.learnerId, verdict.understanding_demonstrated)
     return res.json({
       understanding_demonstrated: verdict.understanding_demonstrated,
       reason: verdict.reason,
@@ -237,6 +238,34 @@ export function createApp(deps: { store: Store; llm: Llm; learnerStore?: Learner
     store.addTurn(req.params.id, { role: 'assistant', content: full })
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`)
     return res.end()
+  })
+
+  app.get('/api/session/:id/review/due', (req, res) => {
+    const s = store.getSession(req.params.id)
+    if (!s) return res.status(404).json({ error: 'no session' })
+    const due = learnerStore.dueItems(s.learnerId, Date.now(), config.retentionThresholdMs)
+    return res.json({ items: due.map((d) => ({ topic: d.topic, term: d.term })) }) // fronts only
+  })
+
+  app.post('/api/session/:id/review/attempt', async (req, res) => {
+    const s = store.getSession(req.params.id)
+    if (!s) return res.status(404).json({ error: 'no session' })
+    const topic = String(req.body?.topic ?? '')
+    const term = String(req.body?.term ?? '')
+    const attempt = String(req.body?.attempt ?? '')
+    const definition = learnerStore.getCardDefinition(s.learnerId, topic, term)
+    if (definition === undefined) return res.status(404).json({ error: 'no item' })
+    const guard = await screen(llm, attempt)
+    if (guard.flagged) return res.json({ flagged: true, category: guard.category, redirect: guard.redirect })
+    const verdict = await grade(llm, { question: term, correct_approach: 'Recall the definition of the term.', correct_answer: definition, attempt })
+    const now = Date.now()
+    const prior = learnerStore.getMastery(s.learnerId, topic, term) ?? initialMasteryState()
+    const delayMs = prior.lastSeenAt > 0 ? now - prior.lastSeenAt : 0
+    const next = applyRecall(prior, verdict.understanding_demonstrated, now)
+    learnerStore.setMastery(s.learnerId, topic, term, next)
+    learnerStore.recordRetention(s.learnerId, topic, term, delayMs, verdict.understanding_demonstrated, now)
+    awardRecall(learnerStore, s.learnerId, verdict.understanding_demonstrated)
+    return res.json({ back: definition, correct: verdict.understanding_demonstrated, held: verdict.understanding_demonstrated, delayMs, box: next.box, mastered: isMastered(next) })
   })
 
   return app
