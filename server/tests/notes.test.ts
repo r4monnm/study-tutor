@@ -11,9 +11,12 @@ describe('notes engine', () => {
     expect(text).not.toContain('understanding check passed') // no answer-gate language
   })
 
-  it('kicks off with a user turn when history is empty', () => {
+  it('kicks off with a user turn (carrying the sandwich) when history is empty', () => {
     const ctx = buildNotesContext({ topic: 'x', modeInstructions: 'M', history: [] })
-    expect(ctx.messages).toEqual([{ role: 'user', content: 'Begin.' }])
+    expect(ctx.messages).toHaveLength(1)
+    expect(ctx.messages[0].role).toBe('user')
+    expect(ctx.messages[0].content).toContain('Begin.')
+    expect(ctx.messages[0].content).toContain('<system-reminder>')
   })
 
   it('prepends a user turn when replayed history begins with an assistant message', () => {
