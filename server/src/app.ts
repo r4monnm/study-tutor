@@ -180,5 +180,32 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     return res.json(result)
   })
 
+  app.post('/api/session/:id/notes/say', (req, res) => {
+    const s = store.getSession(req.params.id)
+    if (!s) return res.status(404).json({ error: 'no session' })
+    store.addTurn(req.params.id, { role: 'user', content: String(req.body?.text ?? '') })
+    return res.json({ ok: true })
+  })
+
+  app.get('/api/session/:id/notes', async (req, res) => {
+    const s = store.getSession(req.params.id)
+    if (!s) return res.status(404).end()
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+    const ctx = buildNotesContext({
+      topic: s.topic,
+      modeInstructions: modeInstructions('notes'),
+      history: s.history,
+    })
+    const full = await llm.streamText(
+      { model: config.tutorModel, system: ctx.system, messages: ctx.messages, adaptiveThinking: true },
+      (t) => res.write(`data: ${JSON.stringify({ token: t })}\n\n`),
+    )
+    store.addTurn(req.params.id, { role: 'assistant', content: full })
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`)
+    return res.end()
+  })
+
   return app
 }
