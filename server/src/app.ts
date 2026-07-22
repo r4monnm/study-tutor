@@ -268,5 +268,23 @@ export function createApp(deps: { store: Store; llm: Llm; learnerStore?: Learner
     return res.json({ back: definition, correct: verdict.understanding_demonstrated, held: verdict.understanding_demonstrated, delayMs, box: next.box, mastered: isMastered(next) })
   })
 
+  app.get('/api/session/:id/dashboard', (req, res) => {
+    const s = store.getSession(req.params.id)
+    if (!s) return res.status(404).json({ error: 'no session' })
+    const stats = learnerStore.getStats(s.learnerId)
+    const topics = learnerStore.topics(s.learnerId).map((topic) => ({
+      topic,
+      ...learnerStore.topicSummary(s.learnerId, topic),
+      personalBest: learnerStore.getPersonalBest(s.learnerId, topic),
+    }))
+    return res.json({
+      points: stats.points,
+      currentStreak: stats.currentStreak,
+      bestStreak: stats.bestStreak,
+      topics,
+      retention: learnerStore.retentionSummary(s.learnerId),
+    })
+  })
+
   return app
 }
