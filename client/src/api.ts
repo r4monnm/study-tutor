@@ -51,15 +51,14 @@ export function streamTutor(
   onDone: (unlocked: boolean) => void,
 ): void {
   const es = new EventSource(`/api/session/${id}/tutor`)
+  let done = false
+  const finish = (unlocked: boolean) => { if (done) return; done = true; es.close(); onDone(unlocked) }
   es.onmessage = (e) => {
     const data = JSON.parse(e.data)
     if (data.token) onToken(data.token)
-    if (data.done) {
-      onDone(!!data.unlocked)
-      es.close()
-    }
+    if (data.done) finish(!!data.unlocked)
   }
-  es.onerror = () => es.close()
+  es.onerror = () => finish(false) // a stream error (e.g. bad key) still resolves, so the UI never hangs
 }
 
 // --- Stage 2 helpers (Notes / Flashcards / Game) ---
@@ -110,12 +109,14 @@ export async function notesSay(id: string, text: string): Promise<{ ok?: boolean
 }
 export function streamNotes(id: string, onToken: (t: string) => void, onDone: () => void): void {
   const es = new EventSource(`/api/session/${id}/notes`)
+  let done = false
+  const finish = () => { if (done) return; done = true; es.close(); onDone() }
   es.onmessage = (e) => {
     const data = JSON.parse(e.data)
     if (data.token) onToken(data.token)
-    if (data.done) { onDone(); es.close() }
+    if (data.done) finish()
   }
-  es.onerror = () => es.close()
+  es.onerror = () => finish()
 }
 
 // --- Stage 4 helpers (learnerId, Dashboard, Review) ---

@@ -45,23 +45,23 @@ export default function GameView({ sessionId }: { sessionId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4 text-sm">
-        <span className="rounded-full bg-slate-200 px-3 py-1">⏱ {elapsed}s</span>
-        <span className="rounded-full bg-slate-200 px-3 py-1">streak {streak}</span>
-        {best && <span className="rounded-full bg-green-100 px-3 py-1 text-green-700">best {best.personalBest}s{best.isNewBest ? ' (new!)' : ''}</span>}
-        <button className="ml-auto rounded-lg bg-indigo-600 px-3 py-1 text-white" onClick={newRound}>New round</button>
+        <span className="pill pill-muted">⏱ {elapsed}s</span>
+        <span className="pill pill-muted">streak {streak}</span>
+        {best && <span className="pill pill-unlock">best {best.personalBest}s{best.isNewBest ? ' (new!)' : ''}</span>}
+        <button className="btn ml-auto px-3 py-1 text-sm" onClick={newRound}>New round</button>
       </div>
       <div className="grid grid-cols-3 gap-2">
         {tiles.map((t, i) => {
           const done = cleared.has(t.cardId)
           return (
             <button key={i} onClick={() => tap(i)} disabled={done}
-              className={`min-h-16 rounded-lg border p-2 text-sm ${done ? 'invisible' : selected === i ? 'bg-indigo-600 text-white' : 'bg-white'}`}>
+              className={`min-h-16 p-2 text-sm ${done ? 'invisible' : selected === i ? 'tile tile-active' : 'tile'}`}>
               {t.text}
             </button>
           )
         })}
       </div>
-      {best && <div className="text-center text-slate-600">Cleared in {elapsed}s! 🎉</div>}
+      {best && <div className="muted text-center">Cleared in {elapsed}s! 🎉</div>}
     </div>
   )
 }

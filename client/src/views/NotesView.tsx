@@ -31,14 +31,14 @@ export default function NotesView({ sessionId }: { sessionId: string }) {
   return (
     <div className="flex flex-col gap-3">
       {chunks.map((c, i) => (
-        <div key={i} className={c.startsWith('You: ') ? 'self-end rounded-2xl bg-indigo-600 px-4 py-2 text-white' : 'self-start rounded-2xl bg-white px-4 py-2 shadow whitespace-pre-wrap'}>
+        <div key={i} className={c.startsWith('You: ') ? 'bubble-you self-end rounded-2xl px-4 py-2' : 'bubble-tutor self-start rounded-2xl px-4 py-2 whitespace-pre-wrap'}>
           {c || (busy ? '…' : '')}
         </div>
       ))}
       <div className="sticky bottom-4 flex gap-2">
-        <input className="flex-1 rounded-lg border bg-white px-3 py-2" placeholder="Answer the check question, or say 'ready'…"
+        <input className="field flex-1" placeholder="Answer the check question, or say 'ready'…"
           value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} disabled={busy} />
-        <button className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-50" onClick={send} disabled={busy}>Send</button>
+        <button className="btn" onClick={send} disabled={busy}>Send</button>
       </div>
     </div>
   )
