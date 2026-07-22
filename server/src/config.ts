@@ -4,4 +4,5 @@ export const config = {
   problemModel: process.env.PROBLEM_MODEL ?? 'claude-sonnet-5',
   hintCap: Number(process.env.HINT_CAP ?? 3),
   port: Number(process.env.PORT ?? 8787),
+  guardrailClassifier: (process.env.GUARDRAIL_CLASSIFIER ?? 'true') !== 'false',
 }
