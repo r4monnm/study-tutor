@@ -67,4 +67,18 @@ describe('flashcards API', () => {
     expect(res.body.seen).toBe(1)
     expect(res.body.mastered).toBe(0)
   })
+
+  it('regenerates the deck when the topic changes mid-session', async () => {
+    const llm = new FakeLlm()
+    const app = createApp({ store: new MemoryStore(), llm })
+    const id = (await request(app).post('/api/session')).body.id as string
+    await request(app).post(`/api/session/${id}/topic`).send({ topic: 'algebra', mode: 'flashcards' })
+    llm.jsonResponses.push({ cards: [{ term: 'variable', definition: 'ALGEBRA_DEF' }] })
+    await request(app).post(`/api/session/${id}/deck`)
+    // switch topic mid-session — the cached algebra deck must not be reused
+    await request(app).post(`/api/session/${id}/topic`).send({ topic: 'biology', mode: 'flashcards' })
+    llm.jsonResponses.push({ cards: [{ term: 'cell', definition: 'BIOLOGY_DEF' }] })
+    const res = await request(app).get(`/api/session/${id}/flashcard/next`)
+    expect(res.body.card.term).toBe('cell') // regenerated for the new topic
+  })
 })

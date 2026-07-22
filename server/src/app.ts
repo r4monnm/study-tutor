@@ -25,7 +25,7 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     const s = store.getSession(sid)
     if (!s) return undefined
     let deck = store.getDeck(sid)
-    if (!deck) {
+    if (!deck || deck.topic !== s.topic) {
       const cards = await generateDeck(llm, s.topic)
       deck = { topic: s.topic, cards }
       store.putDeck(sid, deck)
