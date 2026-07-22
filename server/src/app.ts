@@ -162,5 +162,23 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     return res.json({ total: deck.cards.length, mastered, seen })
   })
 
+  app.get('/api/session/:id/game/board', async (req, res) => {
+    const deck = await ensureDeck(req.params.id)
+    if (!deck) return res.status(404).json({ error: 'no session' })
+    const entries = deck.cards.map((card) => ({ card, state: store.getMastery(req.params.id, card.id) }))
+    const weakest = weakestFirst(entries).slice(0, 6)
+    return res.json({ tiles: buildBoard(weakest) })
+  })
+
+  app.post('/api/session/:id/game/result', (req, res) => {
+    const s = store.getSession(req.params.id)
+    if (!s) return res.status(404).json({ error: 'no session' })
+    const seconds = Number(req.body?.timeSeconds)
+    if (!Number.isFinite(seconds) || seconds < 0) return res.status(400).json({ error: 'bad timeSeconds' })
+    const result = updatePersonalBest(store.getPersonalBest(req.params.id, s.topic), seconds)
+    store.setPersonalBest(req.params.id, s.topic, result.personalBest)
+    return res.json(result)
+  })
+
   return app
 }
