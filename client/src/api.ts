@@ -1,9 +1,12 @@
 export interface ClientProblem { id: string; question: string; qType: string }
 export interface AttemptResult {
-  understanding_demonstrated: boolean
-  reason: string
+  understanding_demonstrated?: boolean
+  reason?: string
   hintLevel: number
   unlocked: boolean
+  flagged?: boolean
+  redirect?: string
+  category?: string
 }
 
 export async function createSession(): Promise<{ id: string; greeting: string }> {
@@ -53,7 +56,16 @@ export function streamTutor(
 // --- Stage 2 helpers (Notes / Flashcards / Game) ---
 
 export interface CardFront { id: string; term: string }
-export interface FlashcardResult { back: string; correct: boolean; reason: string; box: number; mastered: boolean }
+export interface FlashcardResult {
+  back?: string
+  correct?: boolean
+  reason?: string
+  box: number
+  mastered: boolean
+  flagged?: boolean
+  redirect?: string
+  category?: string
+}
 export interface MasterySummary { total: number; mastered: number; seen: number }
 export interface Tile { cardId: string; kind: 'term' | 'def'; text: string }
 
@@ -81,10 +93,11 @@ export async function gameResult(id: string, timeSeconds: number): Promise<{ per
   })
   return res.json()
 }
-export async function notesSay(id: string, text: string): Promise<void> {
-  await fetch(`/api/session/${id}/notes/say`, {
+export async function notesSay(id: string, text: string): Promise<{ ok?: boolean; flagged?: boolean; redirect?: string }> {
+  const res = await fetch(`/api/session/${id}/notes/say`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }),
   })
+  return res.json()
 }
 export function streamNotes(id: string, onToken: (t: string) => void, onDone: () => void): void {
   const es = new EventSource(`/api/session/${id}/notes`)

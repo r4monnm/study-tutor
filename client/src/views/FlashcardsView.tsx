@@ -18,8 +18,9 @@ export default function FlashcardsView({ sessionId }: { sessionId: string }) {
   async function commit() {
     if (!card || !attempt.trim() || busy) return
     setBusy(true)
-    setResult(await gradeCard(sessionId, card.id, attempt))
-    setSummary(await masterySummary(sessionId))
+    const r = await gradeCard(sessionId, card.id, attempt)
+    setResult(r)
+    if (!r.flagged) setSummary(await masterySummary(sessionId))
     setBusy(false)
   }
 
@@ -38,6 +39,12 @@ export default function FlashcardsView({ sessionId }: { sessionId: string }) {
           <input className="flex-1 rounded-lg border bg-white px-3 py-2" placeholder="Type what you remember…"
             value={attempt} onChange={(e) => setAttempt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commit()} disabled={busy} />
           <button className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-50" onClick={commit} disabled={busy}>Reveal</button>
+        </div>
+      ) : result.flagged ? (
+        <div className="flex flex-col gap-3">
+          <div className="rounded-lg bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 self-start">Nice try 😄</div>
+          <div className="text-slate-600">{result.redirect}</div>
+          <button className="self-start rounded-lg bg-indigo-600 px-4 py-2 text-white" onClick={() => { setResult(null); setAttempt('') }}>Try again</button>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
