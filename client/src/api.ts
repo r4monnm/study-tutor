@@ -1,3 +1,9 @@
+function learnerId(): string {
+  let id = localStorage.getItem('studytutor.learnerId')
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem('studytutor.learnerId', id) }
+  return id
+}
+
 export interface ClientProblem { id: string; question: string; qType: string }
 export interface AttemptResult {
   understanding_demonstrated?: boolean
@@ -10,7 +16,10 @@ export interface AttemptResult {
 }
 
 export async function createSession(): Promise<{ id: string; greeting: string }> {
-  return (await fetch('/api/session', { method: 'POST' })).json()
+  const res = await fetch('/api/session', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ learnerId: learnerId() }),
+  })
+  return res.json()
 }
 
 export async function setTopic(id: string, topic: string, mode: string): Promise<void> {
@@ -87,9 +96,9 @@ export async function masterySummary(id: string): Promise<MasterySummary> {
 export async function gameBoard(id: string): Promise<Tile[]> {
   return (await (await fetch(`/api/session/${id}/game/board`)).json()).tiles
 }
-export async function gameResult(id: string, timeSeconds: number): Promise<{ personalBest: number; isNewBest: boolean }> {
+export async function gameResult(id: string, timeSeconds: number, wrongMatches: number): Promise<{ personalBest: number; isNewBest: boolean; points?: number }> {
   const res = await fetch(`/api/session/${id}/game/result`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ timeSeconds }),
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ timeSeconds, wrongMatches }),
   })
   return res.json()
 }
@@ -107,4 +116,27 @@ export function streamNotes(id: string, onToken: (t: string) => void, onDone: ()
     if (data.done) { onDone(); es.close() }
   }
   es.onerror = () => es.close()
+}
+
+// --- Stage 4 helpers (learnerId, Dashboard, Review) ---
+
+export interface Dashboard {
+  points: number; currentStreak: number; bestStreak: number
+  topics: { topic: string; mastered: number; total: number; seen: number; personalBest?: number }[]
+  retention: { checks: number; heldRate: number; avgDelayMs: number }
+}
+export interface DueItem { topic: string; term: string }
+export interface ReviewResult { back?: string; correct?: boolean; held?: boolean; delayMs?: number; box?: number; mastered?: boolean; flagged?: boolean; redirect?: string }
+
+export async function getDashboard(id: string): Promise<Dashboard> {
+  return (await fetch(`/api/session/${id}/dashboard`)).json()
+}
+export async function reviewDue(id: string): Promise<DueItem[]> {
+  return (await (await fetch(`/api/session/${id}/review/due`)).json()).items
+}
+export async function reviewAttempt(id: string, topic: string, term: string, attempt: string): Promise<ReviewResult> {
+  const res = await fetch(`/api/session/${id}/review/attempt`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ topic, term, attempt }),
+  })
+  return res.json()
 }
