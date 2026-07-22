@@ -1,5 +1,6 @@
 import { tutorSystemPrompt } from './prompts/tutor'
 import { atCap } from './hints'
+import { appendSandwich, TUTOR_SANDWICH } from './sandwich'
 import type { ChatTurn, Mode } from './store/types'
 
 export interface TutorContextInput {
@@ -41,11 +42,10 @@ export function buildTutorContext(inp: TutorContextInput): { system: string[]; m
   }
 
   const raw: ChatTurn[] = inp.history.length ? inp.history : [{ role: 'user', content: 'Begin.' }]
-  // The Anthropic Messages API requires the first message to be role 'user'.
-  // The first tutor turn stores an assistant message (the posed question) with no
-  // preceding user turn, so replayed history can begin with 'assistant'. Prepend a
-  // synthetic user turn to keep the array API-valid.
-  const messages: ChatTurn[] =
+  const ordered: ChatTurn[] =
     raw[0].role === 'assistant' ? [{ role: 'user', content: 'Begin.' }, ...raw] : raw
+  // Sandwich: reiterate the no-answer rule AFTER user content — locked turns only
+  // (on a reveal turn the app has already confirmed, so no reminder).
+  const messages = inp.reveal ? ordered : appendSandwich(ordered, TUTOR_SANDWICH)
   return { system, messages }
 }

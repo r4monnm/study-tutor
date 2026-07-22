@@ -25,9 +25,12 @@ describe('buildTutorContext', () => {
     expect(JSON.stringify(ctx)).toContain('PARALLEL example')
   })
 
-  it('kicks off with a Begin turn when there is no history', () => {
+  it('kicks off with a user turn (carrying the sandwich) when there is no history', () => {
     const ctx = buildTutorContext(base)
-    expect(ctx.messages).toEqual([{ role: 'user', content: 'Begin.' }])
+    expect(ctx.messages).toHaveLength(1)
+    expect(ctx.messages[0].role).toBe('user')
+    expect(ctx.messages[0].content).toContain('Begin.')
+    expect(ctx.messages[0].content).toContain('<system-reminder>')
   })
 
   it('always yields a messages array beginning with a user turn (API requires it)', () => {
@@ -37,7 +40,20 @@ describe('buildTutorContext', () => {
     ]
     const ctx = buildTutorContext({ ...base, history: assistantLedHistory, graderHint: 'nudge', hintLevel: 1 })
     expect(ctx.messages[0].role).toBe('user')
-    // history is preserved after the synthetic opener
-    expect(ctx.messages.some((m) => m.content === 'my attempt')).toBe(true)
+    // history is preserved after the synthetic opener (with sandwich appended)
+    expect(ctx.messages.some((m) => m.content.includes('my attempt'))).toBe(true)
+  })
+
+  it('appends the no-answer sandwich after the user turn when locked', () => {
+    const ctx = buildTutorContext({ ...base, history: [{ role: 'user', content: 'my attempt' }] })
+    const last = ctx.messages[ctx.messages.length - 1]
+    expect(last.role).toBe('user')
+    expect(last.content).toContain('my attempt')
+    expect(last.content.indexOf('my attempt')).toBeLessThan(last.content.indexOf('<system-reminder>'))
+  })
+
+  it('does NOT append the sandwich on a reveal turn', () => {
+    const ctx = buildTutorContext({ ...base, reveal: { answer: 'x = 4', approach: 'subtract 3' } })
+    expect(JSON.stringify(ctx.messages)).not.toContain('<system-reminder>')
   })
 })

@@ -23,7 +23,8 @@ export default function NotesView({ sessionId }: { sessionId: string }) {
     if (!input.trim() || busy) return
     const text = input; setInput('')
     setChunks((c) => [...c, `You: ${text}`])
-    await notesSay(sessionId, text)
+    const r = await notesSay(sessionId, text)
+    if (r.flagged) { setChunks((c) => [...c, r.redirect ?? "Let's keep going with the notes."]); return }
     stream()
   }
 

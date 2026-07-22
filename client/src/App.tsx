@@ -76,7 +76,9 @@ function QuizView({ sessionId }: { sessionId: string }) {
   async function send() {
     if (!input.trim() || busy) return
     const a = input; setInput(''); push({ role: 'you', text: a })
-    const r = await submitAttempt(sessionId, a); setHintLevel(r.hintLevel); runTutor()
+    const r = await submitAttempt(sessionId, a)
+    if (r.flagged) { push({ role: 'tutor', text: r.redirect ?? "Let's keep working on it." }); return }
+    setHintLevel(r.hintLevel); runTutor()
   }
   async function next() { await newProblem(sessionId); setUnlocked(false); setHintLevel(0); push({ role: 'system', text: 'New problem.' }); runTutor() }
 
