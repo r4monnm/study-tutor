@@ -16,6 +16,7 @@ import { buildBoard } from './game'
 import { updatePersonalBest } from './game'
 import { toClientProblem, toCardFront, GREETING } from './dto'
 import { screen } from './guardrail'
+import { awardRecall } from './points'
 
 export function createApp(deps: { store: Store; llm: Llm; learnerStore?: LearnerStore }): express.Express {
   const { store, llm } = deps
@@ -32,6 +33,7 @@ export function createApp(deps: { store: Store; llm: Llm; learnerStore?: Learner
       const cards = await generateDeck(llm, s.topic)
       deck = { topic: s.topic, cards }
       store.putDeck(sid, deck)
+      for (const card of cards) learnerStore.upsertCard(s.learnerId, s.topic, card.term, card.definition)
     }
     return deck
   }
@@ -132,7 +134,8 @@ export function createApp(deps: { store: Store; llm: Llm; learnerStore?: Learner
   app.get('/api/session/:id/flashcard/next', async (req, res) => {
     const deck = await ensureDeck(req.params.id)
     if (!deck) return res.status(404).json({ error: 'no session' })
-    const entries = deck.cards.map((card) => ({ card, state: store.getMastery(req.params.id, card.id) }))
+    const s = store.getSession(req.params.id)!
+    const entries = deck.cards.map((card) => ({ card, state: learnerStore.getMastery(s.learnerId, s.topic, card.term) }))
     const ordered = weakestFirst(entries)
     if (ordered.length === 0) return res.status(400).json({ error: 'empty deck' })
     return res.json({ card: toCardFront(ordered[0]) })
@@ -147,7 +150,7 @@ export function createApp(deps: { store: Store; llm: Llm; learnerStore?: Learner
     const attempt = String(req.body?.attempt ?? '')
     const guard = await screen(llm, attempt)
     if (guard.flagged) {
-      const prior = store.getMastery(req.params.id, card.id) ?? initialMasteryState()
+      const prior = learnerStore.getMastery(s.learnerId, s.topic, card.term) ?? initialMasteryState()
       return res.json({
         flagged: true,
         category: guard.category,
@@ -162,9 +165,10 @@ export function createApp(deps: { store: Store; llm: Llm; learnerStore?: Learner
       correct_answer: card.definition,
       attempt,
     })
-    const prior = store.getMastery(req.params.id, card.id) ?? initialMasteryState()
+    const prior = learnerStore.getMastery(s.learnerId, s.topic, card.term) ?? initialMasteryState()
     const next = applyRecall(prior, verdict.understanding_demonstrated, Date.now())
-    store.setMastery(req.params.id, card.id, next)
+    learnerStore.setMastery(s.learnerId, s.topic, card.term, next)
+    awardRecall(learnerStore, s.learnerId, verdict.understanding_demonstrated)
     return res.json({
       back: card.definition,
       correct: verdict.understanding_demonstrated,
@@ -175,22 +179,16 @@ export function createApp(deps: { store: Store; llm: Llm; learnerStore?: Learner
   })
 
   app.get('/api/session/:id/mastery', (req, res) => {
-    const deck = store.getDeck(req.params.id)
-    if (!deck) return res.json({ total: 0, mastered: 0, seen: 0 })
-    const all = store.getAllMastery(req.params.id)
-    let mastered = 0, seen = 0
-    for (const card of deck.cards) {
-      const st = all[card.id]
-      if (st && st.attempts > 0) seen += 1
-      if (st && isMastered(st)) mastered += 1
-    }
-    return res.json({ total: deck.cards.length, mastered, seen })
+    const s = store.getSession(req.params.id)
+    if (!s) return res.json({ total: 0, mastered: 0, seen: 0 })
+    return res.json(learnerStore.topicSummary(s.learnerId, s.topic))
   })
 
   app.get('/api/session/:id/game/board', async (req, res) => {
     const deck = await ensureDeck(req.params.id)
     if (!deck) return res.status(404).json({ error: 'no session' })
-    const entries = deck.cards.map((card) => ({ card, state: store.getMastery(req.params.id, card.id) }))
+    const s = store.getSession(req.params.id)!
+    const entries = deck.cards.map((card) => ({ card, state: learnerStore.getMastery(s.learnerId, s.topic, card.term) }))
     const weakest = weakestFirst(entries).slice(0, 6)
     return res.json({ tiles: buildBoard(weakest) })
   })
