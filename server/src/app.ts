@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import type { Store, Mode, Deck } from './store/types'
 import type { Llm } from './llm/types'
+import { SqliteLearnerStore, type LearnerStore } from './learnerStore'
 import { config } from './config'
 import { generateProblem } from './problem'
 import { grade } from './grader'
@@ -15,9 +16,11 @@ import { buildBoard } from './game'
 import { updatePersonalBest } from './game'
 import { toClientProblem, toCardFront, GREETING } from './dto'
 import { screen } from './guardrail'
+import { awardRecall } from './points'
 
-export function createApp(deps: { store: Store; llm: Llm }): express.Express {
+export function createApp(deps: { store: Store; llm: Llm; learnerStore?: LearnerStore }): express.Express {
   const { store, llm } = deps
+  const learnerStore = deps.learnerStore ?? new SqliteLearnerStore()
   const app = express()
   app.use(cors())
   app.use(express.json())
@@ -30,12 +33,13 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
       const cards = await generateDeck(llm, s.topic)
       deck = { topic: s.topic, cards }
       store.putDeck(sid, deck)
+      for (const card of cards) learnerStore.upsertCard(s.learnerId, s.topic, card.term, card.definition)
     }
     return deck
   }
 
-  app.post('/api/session', (_req, res) => {
-    const s = store.createSession()
+  app.post('/api/session', (req, res) => {
+    const s = store.createSession(String(req.body?.learnerId ?? ''))
     res.json({ id: s.id, greeting: GREETING })
   })
 
@@ -81,6 +85,7 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     })
     const next = applyVerdict(store.getProblemState(s.id, problem.id), verdict, config.hintCap)
     store.setProblemState(s.id, problem.id, next)
+    awardRecall(learnerStore, s.learnerId, verdict.understanding_demonstrated)
     return res.json({
       understanding_demonstrated: verdict.understanding_demonstrated,
       reason: verdict.reason,
@@ -130,7 +135,8 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
   app.get('/api/session/:id/flashcard/next', async (req, res) => {
     const deck = await ensureDeck(req.params.id)
     if (!deck) return res.status(404).json({ error: 'no session' })
-    const entries = deck.cards.map((card) => ({ card, state: store.getMastery(req.params.id, card.id) }))
+    const s = store.getSession(req.params.id)!
+    const entries = deck.cards.map((card) => ({ card, state: learnerStore.getMastery(s.learnerId, s.topic, card.term) }))
     const ordered = weakestFirst(entries)
     if (ordered.length === 0) return res.status(400).json({ error: 'empty deck' })
     return res.json({ card: toCardFront(ordered[0]) })
@@ -145,7 +151,7 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     const attempt = String(req.body?.attempt ?? '')
     const guard = await screen(llm, attempt)
     if (guard.flagged) {
-      const prior = store.getMastery(req.params.id, card.id) ?? initialMasteryState()
+      const prior = learnerStore.getMastery(s.learnerId, s.topic, card.term) ?? initialMasteryState()
       return res.json({
         flagged: true,
         category: guard.category,
@@ -160,9 +166,10 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
       correct_answer: card.definition,
       attempt,
     })
-    const prior = store.getMastery(req.params.id, card.id) ?? initialMasteryState()
+    const prior = learnerStore.getMastery(s.learnerId, s.topic, card.term) ?? initialMasteryState()
     const next = applyRecall(prior, verdict.understanding_demonstrated, Date.now())
-    store.setMastery(req.params.id, card.id, next)
+    learnerStore.setMastery(s.learnerId, s.topic, card.term, next)
+    awardRecall(learnerStore, s.learnerId, verdict.understanding_demonstrated)
     return res.json({
       back: card.definition,
       correct: verdict.understanding_demonstrated,
@@ -173,22 +180,16 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
   })
 
   app.get('/api/session/:id/mastery', (req, res) => {
-    const deck = store.getDeck(req.params.id)
-    if (!deck) return res.json({ total: 0, mastered: 0, seen: 0 })
-    const all = store.getAllMastery(req.params.id)
-    let mastered = 0, seen = 0
-    for (const card of deck.cards) {
-      const st = all[card.id]
-      if (st && st.attempts > 0) seen += 1
-      if (st && isMastered(st)) mastered += 1
-    }
-    return res.json({ total: deck.cards.length, mastered, seen })
+    const s = store.getSession(req.params.id)
+    if (!s) return res.json({ total: 0, mastered: 0, seen: 0 })
+    return res.json(learnerStore.topicSummary(s.learnerId, s.topic))
   })
 
   app.get('/api/session/:id/game/board', async (req, res) => {
     const deck = await ensureDeck(req.params.id)
     if (!deck) return res.status(404).json({ error: 'no session' })
-    const entries = deck.cards.map((card) => ({ card, state: store.getMastery(req.params.id, card.id) }))
+    const s = store.getSession(req.params.id)!
+    const entries = deck.cards.map((card) => ({ card, state: learnerStore.getMastery(s.learnerId, s.topic, card.term) }))
     const weakest = weakestFirst(entries).slice(0, 6)
     return res.json({ tiles: buildBoard(weakest) })
   })
@@ -198,9 +199,13 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     if (!s) return res.status(404).json({ error: 'no session' })
     const seconds = Number(req.body?.timeSeconds)
     if (!Number.isFinite(seconds) || seconds < 0) return res.status(400).json({ error: 'bad timeSeconds' })
-    const result = updatePersonalBest(store.getPersonalBest(req.params.id, s.topic), seconds)
-    store.setPersonalBest(req.params.id, s.topic, result.personalBest)
-    return res.json(result)
+    const wrongMatches = Number(req.body?.wrongMatches)
+    const result = updatePersonalBest(learnerStore.getPersonalBest(s.learnerId, s.topic), seconds)
+    learnerStore.setPersonalBest(s.learnerId, s.topic, result.personalBest)
+    // Accuracy-scaled points: a clean board (0 wrong) earns the most; never below 1.
+    const points = Number.isFinite(wrongMatches) ? Math.max(1, 12 - Math.max(0, wrongMatches)) : 1
+    learnerStore.awardCorrect(s.learnerId, points)
+    return res.json({ ...result, points })
   })
 
   app.post('/api/session/:id/notes/say', async (req, res) => {
@@ -233,6 +238,52 @@ export function createApp(deps: { store: Store; llm: Llm }): express.Express {
     store.addTurn(req.params.id, { role: 'assistant', content: full })
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`)
     return res.end()
+  })
+
+  app.get('/api/session/:id/review/due', (req, res) => {
+    const s = store.getSession(req.params.id)
+    if (!s) return res.status(404).json({ error: 'no session' })
+    const due = learnerStore.dueItems(s.learnerId, Date.now(), config.retentionThresholdMs)
+    return res.json({ items: due.map((d) => ({ topic: d.topic, term: d.term })) }) // fronts only
+  })
+
+  app.post('/api/session/:id/review/attempt', async (req, res) => {
+    const s = store.getSession(req.params.id)
+    if (!s) return res.status(404).json({ error: 'no session' })
+    const topic = String(req.body?.topic ?? '')
+    const term = String(req.body?.term ?? '')
+    const attempt = String(req.body?.attempt ?? '')
+    const definition = learnerStore.getCardDefinition(s.learnerId, topic, term)
+    if (definition === undefined) return res.status(404).json({ error: 'no item' })
+    const guard = await screen(llm, attempt)
+    if (guard.flagged) return res.json({ flagged: true, category: guard.category, redirect: guard.redirect })
+    const verdict = await grade(llm, { question: term, correct_approach: 'Recall the definition of the term.', correct_answer: definition, attempt })
+    const now = Date.now()
+    const prior = learnerStore.getMastery(s.learnerId, topic, term) ?? initialMasteryState()
+    const delayMs = prior.lastSeenAt > 0 ? now - prior.lastSeenAt : 0
+    const next = applyRecall(prior, verdict.understanding_demonstrated, now)
+    learnerStore.setMastery(s.learnerId, topic, term, next)
+    learnerStore.recordRetention(s.learnerId, topic, term, delayMs, verdict.understanding_demonstrated, now)
+    awardRecall(learnerStore, s.learnerId, verdict.understanding_demonstrated)
+    return res.json({ back: definition, correct: verdict.understanding_demonstrated, held: verdict.understanding_demonstrated, delayMs, box: next.box, mastered: isMastered(next) })
+  })
+
+  app.get('/api/session/:id/dashboard', (req, res) => {
+    const s = store.getSession(req.params.id)
+    if (!s) return res.status(404).json({ error: 'no session' })
+    const stats = learnerStore.getStats(s.learnerId)
+    const topics = learnerStore.topics(s.learnerId).map((topic) => ({
+      topic,
+      ...learnerStore.topicSummary(s.learnerId, topic),
+      personalBest: learnerStore.getPersonalBest(s.learnerId, topic),
+    }))
+    return res.json({
+      points: stats.points,
+      currentStreak: stats.currentStreak,
+      bestStreak: stats.bestStreak,
+      topics,
+      retention: learnerStore.retentionSummary(s.learnerId),
+    })
   })
 
   return app

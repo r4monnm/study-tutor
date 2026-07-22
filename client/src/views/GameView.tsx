@@ -39,7 +39,7 @@ export default function GameView({ sessionId }: { sessionId: string }) {
     if (timer.current) clearInterval(timer.current)
     const total = Math.floor((Date.now() - start.current) / 1000) + penalty.current
     setElapsed(total)
-    setBest(await gameResult(sessionId, total))
+    setBest(await gameResult(sessionId, total, penalty.current))
   }
 
   return (

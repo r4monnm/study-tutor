@@ -40,18 +40,17 @@ export interface MasteryState {
 
 export interface Session {
   id: string
+  learnerId: string
   topic: string
   mode: Mode
   history: ChatTurn[]
   problems: Record<string, { problem: Problem; state: ProblemState }>
   activeProblemId?: string
   deck?: Deck
-  mastery: Record<string, MasteryState>
-  personalBests: Record<string, number>
 }
 
 export interface Store {
-  createSession(): Session
+  createSession(learnerId?: string): Session
   getSession(id: string): Session | undefined
   setTopicMode(id: string, topic: string, mode: Mode): void
   addTurn(id: string, turn: ChatTurn): void
@@ -62,9 +61,4 @@ export interface Store {
   setProblemState(sid: string, pid: string, state: ProblemState): void
   putDeck(sid: string, deck: Deck): void
   getDeck(sid: string): Deck | undefined
-  getMastery(sid: string, cardId: string): MasteryState | undefined
-  setMastery(sid: string, cardId: string, state: MasteryState): void
-  getAllMastery(sid: string): Record<string, MasteryState>
-  getPersonalBest(sid: string, topic: string): number | undefined
-  setPersonalBest(sid: string, topic: string, seconds: number): void
 }

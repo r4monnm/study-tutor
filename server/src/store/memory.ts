@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import type { Store, Session, Problem, ProblemState, ChatTurn, Mode, Deck, MasteryState } from './types'
+import type { Store, Session, Problem, ProblemState, ChatTurn, Mode, Deck } from './types'
 
 export class MemoryStore implements Store {
   private sessions = new Map<string, Session>()
 
-  createSession(): Session {
-    const s: Session = { id: randomUUID(), topic: '', mode: 'quiz', history: [], problems: {}, mastery: {}, personalBests: {} }
+  createSession(learnerId = ''): Session {
+    const s: Session = { id: randomUUID(), learnerId, topic: '', mode: 'quiz', history: [], problems: {} }
     this.sessions.set(s.id, s)
     return s
   }
@@ -51,26 +51,6 @@ export class MemoryStore implements Store {
 
   getDeck(sid: string): Deck | undefined {
     return this.getSession(sid)?.deck
-  }
-
-  getMastery(sid: string, cardId: string): MasteryState | undefined {
-    return this.getSession(sid)?.mastery[cardId]
-  }
-
-  setMastery(sid: string, cardId: string, state: MasteryState): void {
-    this.must(sid).mastery[cardId] = state
-  }
-
-  getAllMastery(sid: string): Record<string, MasteryState> {
-    return this.must(sid).mastery
-  }
-
-  getPersonalBest(sid: string, topic: string): number | undefined {
-    return this.getSession(sid)?.personalBests[topic]
-  }
-
-  setPersonalBest(sid: string, topic: string, seconds: number): void {
-    this.must(sid).personalBests[topic] = seconds
   }
 
   private must(id: string): Session {

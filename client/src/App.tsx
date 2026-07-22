@@ -3,8 +3,10 @@ import { createSession, setTopic, newProblem, submitAttempt, streamTutor } from 
 import NotesView from './views/NotesView'
 import FlashcardsView from './views/FlashcardsView'
 import GameView from './views/GameView'
+import DashboardView from './views/DashboardView'
+import ReviewView from './views/ReviewView'
 
-type Mode = 'quiz' | 'notes' | 'flashcards' | 'game'
+type Mode = 'quiz' | 'notes' | 'flashcards' | 'game' | 'review' | 'dashboard'
 interface Msg { role: 'tutor' | 'you' | 'system'; text: string }
 
 export default function App() {
@@ -16,17 +18,23 @@ export default function App() {
   useEffect(() => { createSession().then((s) => { setSessionId(s.id); setGreeting(s.greeting) }) }, [])
 
   async function start(m: Mode) {
-    if (!topic.trim() || !sessionId) return
-    await setTopic(sessionId, topic, m)
+    if (!sessionId) return
+    if (m !== 'review') {
+      if (!topic.trim()) return
+      await setTopic(sessionId, topic, m)
+    }
     setMode(m)
   }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
-        <header>
-          <h1 className="text-2xl font-bold">Study Tutor</h1>
-          <p className="text-sm text-slate-500">Four modes, one rule: you work for the answer.</p>
+        <header className="flex items-end justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Study Tutor</h1>
+            <p className="text-sm text-slate-500">Four modes, one rule: you work for the answer.</p>
+          </div>
+          {sessionId && <button className="rounded-lg border px-3 py-1 text-sm" onClick={() => setMode('dashboard')}>📊 Dashboard</button>}
         </header>
 
         {!mode ? (
@@ -35,9 +43,9 @@ export default function App() {
             <input className="rounded-lg border px-3 py-2" placeholder="What do you want to study?"
               value={topic} onChange={(e) => setTopicInput(e.target.value)} />
             <div className="flex flex-wrap gap-2">
-              {(['quiz', 'notes', 'flashcards', 'game'] as Mode[]).map((m) => (
+              {(['quiz', 'notes', 'flashcards', 'game', 'review'] as Mode[]).map((m) => (
                 <button key={m} className="rounded-lg bg-indigo-600 px-4 py-2 font-medium capitalize text-white disabled:opacity-40"
-                  onClick={() => start(m)} disabled={!topic.trim()}>{m}</button>
+                  onClick={() => start(m)} disabled={!topic.trim() && m !== 'review'}>{m}</button>
               ))}
             </div>
           </div>
@@ -48,6 +56,8 @@ export default function App() {
             {mode === 'notes' && <NotesView sessionId={sessionId} />}
             {mode === 'flashcards' && <FlashcardsView sessionId={sessionId} />}
             {mode === 'game' && <GameView sessionId={sessionId} />}
+            {mode === 'review' && <ReviewView sessionId={sessionId} />}
+            {mode === 'dashboard' && <DashboardView sessionId={sessionId} />}
           </>
         )}
       </div>
