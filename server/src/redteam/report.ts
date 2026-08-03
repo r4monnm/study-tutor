@@ -1,3 +1,20 @@
+/**
+ * Adversarial evaluation harness — empirical leakage rate.
+ *
+ * Runs every attack in `./attacks.ts` (15 attacks across 5 categories) against the real
+ * guardrail, grader, and answer gate using live Anthropic models, then prints a
+ * per-attack table plus the illegitimate-unlock and leakage rates. An unlock means the
+ * tutor would reveal the answer on the next turn, so the unlock rate *is* the leakage
+ * rate. Exits non-zero if any attack unlocks the gate, so it is safe to wire into CI.
+ *
+ * Run it:
+ *   cd server && npm run redteam                              # full stack (classifier on)
+ *   cd server && GUARDRAIL_CLASSIFIER=false npm run redteam   # isolate heuristic + grader
+ *
+ * Requires ANTHROPIC_API_KEY in server/.env. For the deterministic, no-API-key version
+ * that runs in CI, see ../../tests/redteam.test.ts. Recorded results and method:
+ * docs/REDTEAM-RESULTS.md.
+ */
 import 'dotenv/config'
 import { AnthropicLlm } from '../llm/anthropic'
 import { screen } from '../guardrail'
