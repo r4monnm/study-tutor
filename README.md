@@ -221,8 +221,7 @@ Honest limitations, roughly in the order I would address them:
 
 ## How it was built
 
-Developed in four reviewed stages, each spec'd, planned, and implemented test-first;
-design specs and implementation plans live in `docs/superpowers/`.
+Developed in four reviewed stages, each spec'd, planned, and implemented test-first.
 
 1. Quiz + the code-enforced answer gate — the core leak-proof mechanism.
 2. Notes, flashcards, game + the Leitner mastery tracker.
