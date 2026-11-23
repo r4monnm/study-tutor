@@ -27,7 +27,8 @@ export default function AuthGate({ children }: { children: (session: Session) =>
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="aurora-bg relative flex h-[100dvh] flex-col items-center justify-center px-4">
+    <div className="relative flex h-[100dvh] flex-col items-center justify-center px-4 text-slate-100">
+      <div className="aurora-bg" />
       <div className="aurora-veil" />
       <div className="glass w-full max-w-sm p-6">{children}</div>
     </div>
