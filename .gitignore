@@ -1,2 +1,32 @@
+# env files (only the examples are tracked)
 .env*
 !.env.example
+
+# dependencies and build output
+node_modules/
+dist/
+dist-ssr/
+build/
+coverage/
+.vercel/
+
+# logs
+logs/
+*.log
+
+# local databases
+*.db
+*.sqlite
+*.sqlite3
+server/data/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+
+# agent and planning scratch (never part of the repo)
+.claude/
+CLAUDE.md
+.superpowers/
+docs/superpowers/
